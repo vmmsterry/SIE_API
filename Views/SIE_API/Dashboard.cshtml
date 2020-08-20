@@ -1,0 +1,175 @@
+﻿@{
+    ViewBag.Title = "Dashboard";
+}
+
+<link href="~/CSS/Dashboard.css" rel="stylesheet" />
+<style>
+    .bd-placeholder-img {
+        font-size: 1.125rem;
+        text-anchor: middle;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+</style>
+@using (Html.BeginForm())
+{
+    <div class="container-fluid">
+        <div class="row">
+            <main role="main" class="col-md-12 ml-sm-auto col-lg-12 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">Dashboard</h1>
+                </div>
+                <div class="row">
+                    <div class="col-7">
+                        <h4>@Model.Title</h4>
+                        @foreach (var property in Model.GetType().GetProperties())
+                        {
+                            if (!property.Name.Equals("Title") && !property.Name.Equals("Data"))
+                            {
+                                <div class="col-6">
+                                    <div class="row">
+                                        <div class="col">
+                                            <h5 class="font-weight-normal">
+                                                @ViewData.ModelMetadata.Properties.Where(a => a.PropertyName.Equals(property.Name)).Select(a => a.DisplayName).First():
+                                            </h5>
+                                        </div>
+                                        <div class="col">
+                                            <h5 class="font-weight-normal">@(property.GetValue(Model, null))</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+
+                        <div class="col-6">
+                            <div class="row">
+                                <h5>Buscar por año</h5>
+                            </div>
+                            <div class="row">
+                                <div class="col">
+                                    <input type="text" id="year" class="form-control" placeholder="2020" />
+                                </div>
+                                <div class="col">
+                                    <input type="button" id="btnBuscar" class="btn-primary btn-sm" value="Buscar" />
+                                </div>
+                            </div>
+                            <div id="divError"></div>
+                        </div>
+                    </div>
+                    <div id="divTablaDatos" class="col-5">
+                        <h4 id="hYear"></h4>
+                        <div id="divTable" class="table-responsive"></div>
+                    </div>
+                </div>
+                <div class="row">
+                    <h4 id="hCanvas"></h4>
+                    <canvas class="my-4 w-100" id="grafica" width="900" height="380"></canvas>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.9.0/feather.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            getTabla(0);
+            grafica(0);
+
+            function grafica(year) {
+                'use strict'
+
+                feather.replace()
+
+                var ctx = document.getElementById('grafica')
+
+                var myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [
+                        ],
+                        datasets: [{
+                            data: [
+
+                            ],
+                            lineTension: 0,
+                            backgroundColor: 'transparent',
+                            borderColor: '#007bff',
+                            borderWidth: 4,
+                            pointBackgroundColor: '#007bff'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: false
+                                }
+                            }]
+                        },
+                        legend: {
+                            display: false
+                        }
+                    }
+                });
+
+                $.get("/SIE_API/SetValotes", { 'year': year }, function (data, status) {
+                    $("#hCanvas").html(data.msjGrafica);
+
+                    var meses = data.meses.split(',');
+                    for (var i = 0; i < meses.length; i++) {
+                        myChart.data.labels.push(meses[i]);
+                    }
+
+                    var valores = data.valores.split(',');
+                    for (var i = 0; i < valores.length; i++) {
+                        myChart.data.datasets.forEach((dataset) => {
+                            dataset.data.push(valores[i]);
+                        });
+                    }
+                    myChart.update();
+                });
+            }
+
+            $("#btnBuscar").click(function () {
+                var actualYear = (new Date).getFullYear();
+                var year = $("#year").val() === '0' ? actualYear : $("#year").val();
+                fecha = /^([0-9]{4})$/;
+                if (year.match(/^([0-9]{4})$/)) {
+                    if (year >= 1983 && year <= actualYear) {
+                        $("#divError").html('');
+                        getTabla(year);
+                        grafica(year);
+                    }
+                    else {
+                        $("#divError").html('<div id="divError" class="alert-danger text-center">' + 'El año deben estar entre 1983 y el ' + actualYear + '.' + '</div>');
+                    }
+                }
+                else {
+                    $("#divError").html('<div id="divError" class="alert-danger text-center">' +'Para el formato de año deben ser 4 numeros por ejemplo "'+actualYear+'".'+'</div>');
+                }
+            });
+
+            function getTabla(year) {
+                var count = 1;
+                var htmlTable = '<table class="table table-striped table-sm"><thead><tr>' +
+                    '<th>#</th><th>Fecha</th><th>Porcentaje</th></tr></thead><tbody>';
+                $.get("/SIE_API/TablaDatos", { 'year': year }, function (data) {
+                    $("#hYear").html(data.msjTabla);
+                    $.each(data.lt, function (i, item) {
+                        htmlTable += '<tr><td>' + count + '</td><td>'
+                            + item.Date + '</td><td>' + item.Data + '</td></tr>';
+                        count++;
+                    });
+                    htmlTable += '</tbody></table>';
+                    $("#divTable").html(htmlTable);
+                });
+                
+            }
+
+        });
+    </script>
+}
